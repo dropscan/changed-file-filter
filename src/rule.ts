@@ -1,7 +1,25 @@
+import {filter} from 'minimatch'
 import {safeLoad} from 'js-yaml'
-export interface Rule {
+
+export class Rule {
   name: string
-  match: string[]
+  patterns: string[]
+
+  private predicates: ((p: string) => boolean)[]
+
+  constructor(name: string, patterns: string[]) {
+    this.name = name
+    this.patterns = patterns
+    this.predicates = patterns.map(pattern => filter(pattern))
+  }
+
+  matches(filename: string): boolean {
+    return this.predicates.some(p => p(filename))
+  }
+
+  filter(filenames: string[]): string[] {
+    return filenames.filter(filename => this.matches(filename))
+  }
 }
 
 export function parseRules(rule: string): Rule[] {
@@ -9,14 +27,14 @@ export function parseRules(rule: string): Rule[] {
   if (typeof rules !== 'object') {
     throw new Error('expect an map')
   }
-  return (Object.keys(rules) as (keyof typeof rules)[]).reduce((acc, c) => {
-    if (!Array.isArray(rules[c])) {
-      throw new Error('expect an array of string')
+  return Object.entries(rules).map(([name, value]) => {
+    if (!Array.isArray(value)) {
+      throw new Error(`expected an array of strings at ${name}`)
     }
     // check if each element is a string
-    if (!(rules[c] as string[]).every(x => typeof x === 'string')) {
-      throw new Error('expect an array of string')
+    if (!value.every(x => typeof x === 'string')) {
+      throw new Error('expect an array of strings at ${name}')
     }
-    return [...acc, {name: c, match: rules[c] as string[]}]
-  }, [] as Rule[])
+    return new Rule(name, value)
+  })
 }

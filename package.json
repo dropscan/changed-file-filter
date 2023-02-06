@@ -26,7 +26,8 @@
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^1.9.1",
-    "@actions/exec": "^1.1.0"
+    "@actions/exec": "^1.1.0",
+    "minimatch": "^6.1.6"
   },
   "devDependencies": {
     "@types/jest": "^27.4.0",
@@ -35,7 +36,7 @@
     "@types/node": "^12.20.42",
     "@types/tmp": "^0.2.3",
     "@typescript-eslint/parser": "^5.8.1",
-    "@zeit/ncc": "^0.20.5",
+    "@vercel/ncc": "^0.36.1",
     "eslint": "^8.8.0",
     "eslint-plugin-github": "^4.3.5",
     "eslint-plugin-jest": "^26.0.0",

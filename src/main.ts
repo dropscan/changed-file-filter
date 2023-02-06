@@ -1,11 +1,6 @@
 import * as core from '@actions/core'
-import {Rule, parseRules} from './rule'
 import {getChangedFiles, revParse, unshallow} from './git'
-import {newGlobber} from './glob'
-function evaluateRule(rule: Rule, changedFiles: string[]): string[] {
-  const globber = newGlobber(rule.match)
-  return changedFiles.filter(globber)
-}
+import {parseRules} from './rule'
 
 async function getBaseSha(event: string): Promise<string> {
   if (event === 'push') {
@@ -34,12 +29,12 @@ async function run(): Promise<void> {
     const rules = parseRules(core.getInput('filters'))
     const changedFiles = await getChangedFiles(baseSha, headSha)
     core.debug(`changedFiles: ${changedFiles}`)
-    for (const r of rules) {
-      const matchedFiles = evaluateRule(r, changedFiles)
+    for (const rule of rules) {
+      const matchedFiles = rule.filter(changedFiles)
       const changed = matchedFiles.length > 0 ? 'true' : 'false'
-      core.debug(`rule: ${r.name}, changed: ${changed}`)
-      core.setOutput(r.name, changed)
-      core.setOutput(`${r.name}_files`, matchedFiles.join(' '))
+      core.debug(`rule: ${rule.name}, changed: ${changed}`)
+      core.setOutput(rule.name, changed)
+      core.setOutput(`${rule.name}_files`, matchedFiles.join(' '))
     }
   } catch (error) {
     core.setFailed(error.message)
