@@ -1,28 +1,36 @@
 import * as core from '@actions/core'
-import {getChangedFiles, revParse, unshallow} from './git'
+import * as github from '@actions/github'
+// eslint-disable-next-line import/no-unresolved
+import {PullRequestEvent, PushEvent} from '@octokit/webhooks-definitions/schema'
+
+import {getChangedFiles, unshallow} from './git'
 import {parseRules} from './rule'
-
-async function getBaseSha(event: string): Promise<string> {
-  if (event === 'push') {
-    return revParse('HEAD^')
-  }
-  return core.getInput('base')
-}
-
-async function getHeadSha(): Promise<string> {
-  const headRef = core.getInput('head-ref')
-  if (headRef.length > 0) {
-    return revParse(headRef)
-  }
-  return core.getInput('head')
-}
 
 async function run(): Promise<void> {
   try {
-    const event = core.getInput('event')
+    let baseSha
+    let headSha
+
+    switch (github.context.eventName) {
+      case 'push': {
+        const event = github.context.payload as PushEvent
+        baseSha = event.before
+        headSha = event.after
+        break
+      }
+      case 'pull_request': {
+        const event = github.context.payload as PullRequestEvent
+        baseSha = event.pull_request.base.sha
+        headSha = event.pull_request.head.sha
+        break
+      }
+      default: {
+        core.error(`Don't know how to handle ${github.context.eventName} event`)
+        return
+      }
+    }
+
     await unshallow()
-    const baseSha = await getBaseSha(event)
-    const headSha = await getHeadSha()
     core.debug(`baseSha: ${baseSha}`)
     core.debug(`headSha: ${headSha}`)
 
@@ -37,7 +45,7 @@ async function run(): Promise<void> {
       core.setOutput(`${rule.name}_files`, matchedFiles.join(' '))
     }
   } catch (error) {
-    core.setFailed(error.message)
+    core.setFailed((error as Error).message)
   }
 }
 
