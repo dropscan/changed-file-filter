@@ -7,21 +7,30 @@ import {getChangedFiles, unshallow} from './git'
 import {parseRules} from './rule'
 
 async function run(): Promise<void> {
+  let changedFiles: string[]
   try {
-    let baseSha
-    let headSha
-
     switch (github.context.eventName) {
       case 'push': {
         const event = github.context.payload as PushEvent
-        baseSha = event.before
-        headSha = event.after
+        const files = new Set<string>()
+        for (const commit of event.commits) {
+          for (const list of [commit.added, commit.modified, commit.removed]) {
+            for (const file of list) {
+              files.add(file)
+            }
+          }
+        }
+        changedFiles = Array.from(files)
         break
       }
       case 'pull_request': {
         const event = github.context.payload as PullRequestEvent
-        baseSha = event.pull_request.base.sha
-        headSha = event.pull_request.head.sha
+        const baseSha = event.pull_request.base.sha
+        const headSha = event.pull_request.head.sha
+        await unshallow()
+        core.debug(`baseSha: ${baseSha}`)
+        core.debug(`headSha: ${headSha}`)
+        changedFiles = await getChangedFiles(baseSha, headSha)
         break
       }
       default: {
@@ -30,12 +39,7 @@ async function run(): Promise<void> {
       }
     }
 
-    await unshallow()
-    core.debug(`baseSha: ${baseSha}`)
-    core.debug(`headSha: ${headSha}`)
-
     const rules = parseRules(core.getInput('filters'))
-    const changedFiles = await getChangedFiles(baseSha, headSha)
     core.debug(`changedFiles: ${changedFiles}`)
     for (const rule of rules) {
       const matchedFiles = rule.filter(changedFiles)
