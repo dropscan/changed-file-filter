@@ -7,26 +7,34 @@
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.unshallow = exports.revParse = exports.getChangedFiles = void 0;
+exports.fetchOne = exports.revParse = exports.getChangedFiles = void 0;
 const exec_1 = __nccwpck_require__(1514);
 async function execForStdOut(commandLine, args, cwd) {
-    return new Promise((resolve, reject) => {
-        try {
-            (0, exec_1.exec)(commandLine, args, {
-                cwd,
-                listeners: {
-                    stdout: buffer => resolve(buffer.toString())
-                }
-                // eslint-disable-next-line github/no-then
-            }).catch(reject);
-        }
-        catch (err) {
-            reject(err);
+    let stdout = '';
+    await (0, exec_1.exec)(commandLine, args, {
+        cwd,
+        listeners: {
+            stdout: buffer => {
+                stdout = buffer.toString();
+            }
         }
     });
+    return stdout;
 }
 async function getMergeBase(shaA, shaB, cwd) {
-    return execForStdOut('git', ['merge-base', shaA, shaB], cwd);
+    const maxLoops = 10;
+    const depthPerLoop = 15;
+    for (let i = 0; i < maxLoops; i++) {
+        // iteratively deepen the local checkout until the merge-base is found
+        try {
+            return execForStdOut('git', ['merge-base', shaA, shaB], cwd);
+        }
+        catch (error) {
+            (0, exec_1.exec)('git', ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB], { cwd });
+        }
+    }
+    const totalCommits = maxLoops * depthPerLoop;
+    throw new Error(`No merge base between ${shaA} and ${shaB} within last ${totalCommits} commits`);
 }
 async function getChangedFiles(baseSha, headSha, cwd) {
     const mergeBase = (await getMergeBase(baseSha, headSha, cwd)).trim();
@@ -41,10 +49,10 @@ async function revParse(rev, cwd) {
     return output.trim();
 }
 exports.revParse = revParse;
-async function unshallow() {
-    return (0, exec_1.exec)('git', ['fetch', '--prune', '--unshallow']);
+async function fetchOne(ref) {
+    return (0, exec_1.exec)('git', ['fetch', '--depth', '1', 'origin', ref]);
 }
-exports.unshallow = unshallow;
+exports.fetchOne = fetchOne;
 
 
 /***/ }),
@@ -86,7 +94,6 @@ async function run() {
     try {
         let baseSha;
         let headSha;
-        await (0, git_1.unshallow)();
         switch (github.context.eventName) {
             case 'push': {
                 const event = github.context.payload;
@@ -95,9 +102,15 @@ async function run() {
                     // do not emit any changed files when a branch is deleted
                     return;
                 }
-                if (event.created || event.forced) {
-                    // new branch has no "before" SHA, and the old commit won't be found on a force push
+                if (event.created) {
+                    // new branch has no "before" SHA, so we compare it to the default branch
+                    await (0, git_1.fetchOne)(event.repository.default_branch);
                     baseSha = await (0, git_1.revParse)(`origin/${event.repository.default_branch}`);
+                }
+                else if (event.forced) {
+                    // the old commit won't be present in our normal clone
+                    await (0, git_1.fetchOne)(event.before);
+                    baseSha = event.before;
                 }
                 else {
                     baseSha = event.before;
