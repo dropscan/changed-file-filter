@@ -3,15 +3,13 @@ import * as github from '@actions/github'
 // eslint-disable-next-line import/no-unresolved
 import {PullRequestEvent, PushEvent} from '@octokit/webhooks-definitions/schema'
 
-import {getChangedFiles, revParse, unshallow} from './git'
+import {fetchOne, getChangedFiles, revParse} from './git'
 import {parseRules} from './rule'
 
 async function run(): Promise<void> {
   try {
     let baseSha
     let headSha
-
-    await unshallow()
 
     switch (github.context.eventName) {
       case 'push': {
@@ -21,9 +19,14 @@ async function run(): Promise<void> {
           // do not emit any changed files when a branch is deleted
           return
         }
-        if (event.created || event.forced) {
-          // new branch has no "before" SHA, and the old commit won't be found on a force push
+        if (event.created) {
+          // new branch has no "before" SHA, so we compare it to the default branch
+          await fetchOne(event.repository.default_branch)
           baseSha = await revParse(`origin/${event.repository.default_branch}`)
+        } else if (event.forced) {
+          // the old commit won't be present in our normal clone
+          await fetchOne(event.before)
+          baseSha = event.before
         } else {
           baseSha = event.before
         }
