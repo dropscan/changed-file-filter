@@ -97,7 +97,7 @@ async function run() {
                 }
                 if (event.created || event.forced) {
                     // new branch has no "before" SHA, and the old commit won't be found on a force push
-                    baseSha = await (0, git_1.revParse)(event.repository.default_branch);
+                    baseSha = await (0, git_1.revParse)(`origin/${event.repository.default_branch}`);
                 }
                 else {
                     baseSha = event.before;
