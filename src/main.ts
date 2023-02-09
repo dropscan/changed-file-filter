@@ -3,41 +3,36 @@ import * as github from '@actions/github'
 // eslint-disable-next-line import/no-unresolved
 import {PullRequestEvent, PushEvent} from '@octokit/webhooks-definitions/schema'
 
-import {getChangedFiles, unshallow} from './git'
+import {getChangedFiles, revParse, unshallow} from './git'
 import {parseRules} from './rule'
 
 async function run(): Promise<void> {
-  let changedFiles: string[]
   try {
+    let baseSha
+    let headSha
+
+    await unshallow()
+
     switch (github.context.eventName) {
       case 'push': {
         const event = github.context.payload as PushEvent
-        const files = new Set<string>()
-        // eslint-disable-next-line no-console
-        console.log(JSON.stringify(event, null, 2))
-        for (const commit of event.commits) {
-          for (const key of ['added', 'modified', 'removed'] as const) {
-            const fileList = commit[key]
-            if (!Array.isArray(fileList)) {
-              core.warning(`${commit.id} commit.${key} is not an array`)
-              continue
-            }
-            for (const file of fileList) {
-              files.add(file)
-            }
-          }
+        headSha = event.after
+        if (event.deleted) {
+          // do not emit any changed files when a branch is deleted
+          return
         }
-        changedFiles = Array.from(files)
+        if (event.created) {
+          // new branch has no "before" SHA
+          baseSha = await revParse(event.repository.default_branch)
+        } else {
+          baseSha = event.before
+        }
         break
       }
       case 'pull_request': {
         const event = github.context.payload as PullRequestEvent
-        const baseSha = event.pull_request.base.sha
-        const headSha = event.pull_request.head.sha
-        await unshallow()
-        core.debug(`baseSha: ${baseSha}`)
-        core.debug(`headSha: ${headSha}`)
-        changedFiles = await getChangedFiles(baseSha, headSha)
+        baseSha = event.pull_request.base.sha
+        headSha = event.pull_request.head.sha
         break
       }
       default: {
@@ -46,7 +41,11 @@ async function run(): Promise<void> {
       }
     }
 
+    core.debug(`baseSha: ${baseSha}`)
+    core.debug(`headSha: ${headSha}`)
+
     const rules = parseRules(core.getInput('filters'))
+    const changedFiles = await getChangedFiles(baseSha, headSha)
     core.debug(`changedFiles: ${changedFiles}`)
     for (const rule of rules) {
       const matchedFiles = rule.filter(changedFiles)

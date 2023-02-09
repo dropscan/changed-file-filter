@@ -2,47 +2,66 @@
 /******/ 	var __webpack_modules__ = ({
 
 /***/ 3374:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.unshallow = exports.revParse = exports.getChangedFiles = void 0;
 const exec_1 = __nccwpck_require__(1514);
-async function execForStdOut(commandLine, args, cwd) {
-    return new Promise((resolve, reject) => {
-        try {
-            (0, exec_1.exec)(commandLine, args, {
-                cwd,
-                listeners: {
-                    stdout: buffer => resolve(buffer.toString())
-                }
-                // eslint-disable-next-line github/no-then
-            }).catch(reject);
-        }
-        catch (err) {
-            reject(err);
-        }
+function execForStdOut(commandLine, args, cwd) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve, reject) => {
+            try {
+                (0, exec_1.exec)(commandLine, args, {
+                    cwd,
+                    listeners: {
+                        stdout: buffer => resolve(buffer.toString())
+                    }
+                    // eslint-disable-next-line github/no-then
+                }).catch(reject);
+            }
+            catch (err) {
+                reject(err);
+            }
+        });
     });
 }
-async function getMergeBase(shaA, shaB, cwd) {
-    return execForStdOut('git', ['merge-base', shaA, shaB], cwd);
+function getMergeBase(shaA, shaB, cwd) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return execForStdOut('git', ['merge-base', shaA, shaB], cwd);
+    });
 }
-async function getChangedFiles(baseSha, headSha, cwd) {
-    const mergeBase = (await getMergeBase(baseSha, headSha, cwd)).trim();
-    return (await execForStdOut('git', ['diff', '--name-only', `${mergeBase}..${headSha}`, '--'], cwd))
-        .split('\n')
-        .map(x => x.trim())
-        .filter(x => x.length > 0);
+function getChangedFiles(baseSha, headSha, cwd) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const mergeBase = (yield getMergeBase(baseSha, headSha, cwd)).trim();
+        return (yield execForStdOut('git', ['diff', '--name-only', `${mergeBase}..${headSha}`, '--'], cwd))
+            .split('\n')
+            .map(x => x.trim())
+            .filter(x => x.length > 0);
+    });
 }
 exports.getChangedFiles = getChangedFiles;
-async function revParse(rev, cwd) {
-    const output = await execForStdOut('git', ['rev-parse', rev], cwd);
-    return output.trim();
+function revParse(rev, cwd) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const output = yield execForStdOut('git', ['rev-parse', rev], cwd);
+        return output.trim();
+    });
 }
 exports.revParse = revParse;
-async function unshallow() {
-    return (0, exec_1.exec)('git', ['fetch', '--prune', '--unshallow']);
+function unshallow() {
+    return __awaiter(this, void 0, void 0, function* () {
+        return (0, exec_1.exec)('git', ['fetch', '--prune', '--unshallow']);
+    });
 }
 exports.unshallow = unshallow;
 
@@ -77,63 +96,71 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
 const git_1 = __nccwpck_require__(3374);
 const rule_1 = __nccwpck_require__(6065);
-async function run() {
-    let changedFiles;
-    try {
-        switch (github.context.eventName) {
-            case 'push': {
-                const event = github.context.payload;
-                const files = new Set();
-                // eslint-disable-next-line no-console
-                console.log(JSON.stringify(event, null, 2));
-                for (const commit of event.commits) {
-                    for (const key of ['added', 'modified', 'removed']) {
-                        const fileList = commit[key];
-                        if (!Array.isArray(fileList)) {
-                            core.warning(`${commit.id} commit.${key} is not an array`);
-                            continue;
-                        }
-                        for (const file of fileList) {
-                            files.add(file);
-                        }
+function run() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let baseSha;
+            let headSha;
+            yield (0, git_1.unshallow)();
+            switch (github.context.eventName) {
+                case 'push': {
+                    const event = github.context.payload;
+                    headSha = event.after;
+                    if (event.deleted) {
+                        // do not emit any changed files when a branch is deleted
+                        return;
                     }
+                    if (event.created) {
+                        // new branch has no "before" SHA
+                        baseSha = yield (0, git_1.revParse)(event.repository.default_branch);
+                    }
+                    else {
+                        baseSha = event.before;
+                    }
+                    break;
                 }
-                changedFiles = Array.from(files);
-                break;
+                case 'pull_request': {
+                    const event = github.context.payload;
+                    baseSha = event.pull_request.base.sha;
+                    headSha = event.pull_request.head.sha;
+                    break;
+                }
+                default: {
+                    core.error(`Don't know how to handle ${github.context.eventName} event`);
+                    return;
+                }
             }
-            case 'pull_request': {
-                const event = github.context.payload;
-                const baseSha = event.pull_request.base.sha;
-                const headSha = event.pull_request.head.sha;
-                await (0, git_1.unshallow)();
-                core.debug(`baseSha: ${baseSha}`);
-                core.debug(`headSha: ${headSha}`);
-                changedFiles = await (0, git_1.getChangedFiles)(baseSha, headSha);
-                break;
-            }
-            default: {
-                core.error(`Don't know how to handle ${github.context.eventName} event`);
-                return;
+            core.debug(`baseSha: ${baseSha}`);
+            core.debug(`headSha: ${headSha}`);
+            const rules = (0, rule_1.parseRules)(core.getInput('filters'));
+            const changedFiles = yield (0, git_1.getChangedFiles)(baseSha, headSha);
+            core.debug(`changedFiles: ${changedFiles}`);
+            for (const rule of rules) {
+                const matchedFiles = rule.filter(changedFiles);
+                const changed = matchedFiles.length > 0 ? 'true' : 'false';
+                core.debug(`rule: ${rule.name}, changed: ${changed}`);
+                core.setOutput(rule.name, changed);
+                core.setOutput(`${rule.name}_files`, matchedFiles.join(' '));
             }
         }
-        const rules = (0, rule_1.parseRules)(core.getInput('filters'));
-        core.debug(`changedFiles: ${changedFiles}`);
-        for (const rule of rules) {
-            const matchedFiles = rule.filter(changedFiles);
-            const changed = matchedFiles.length > 0 ? 'true' : 'false';
-            core.debug(`rule: ${rule.name}, changed: ${changed}`);
-            core.setOutput(rule.name, changed);
-            core.setOutput(`${rule.name}_files`, matchedFiles.join(' '));
+        catch (error) {
+            core.setFailed(error.message);
         }
-    }
-    catch (error) {
-        core.setFailed(error.message);
-    }
+    });
 }
 run();
 
@@ -150,9 +177,6 @@ exports.parseRules = exports.Rule = void 0;
 const minimatch_1 = __nccwpck_require__(2002);
 const js_yaml_1 = __nccwpck_require__(1917);
 class Rule {
-    name;
-    patterns;
-    predicates;
     constructor(name, patterns) {
         this.name = name;
         this.patterns = patterns;
