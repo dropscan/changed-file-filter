@@ -5,20 +5,18 @@ async function execForStdOut(
   args?: string[],
   cwd?: string
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      exec(commandLine, args, {
-        cwd,
-        listeners: {
-          stdout: buffer => resolve(buffer.toString())
-        }
-        // eslint-disable-next-line github/no-then
-      }).catch(reject)
-    } catch (err) {
-      reject(err)
+  let stdout = ''
+  await exec(commandLine, args, {
+    cwd,
+    listeners: {
+      stdout: buffer => {
+        stdout = buffer.toString()
+      }
     }
   })
+  return stdout
 }
+
 async function getMergeBase(
   shaA: string,
   shaB: string,
