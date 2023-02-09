@@ -89,9 +89,16 @@ async function run() {
             case 'push': {
                 const event = github.context.payload;
                 const files = new Set();
+                // eslint-disable-next-line no-console
+                console.log(JSON.stringify(event, null, 2));
                 for (const commit of event.commits) {
-                    for (const list of [commit.added, commit.modified, commit.removed]) {
-                        for (const file of list) {
+                    for (const key of ['added', 'modified', 'removed']) {
+                        const fileList = commit[key];
+                        if (!Array.isArray(fileList)) {
+                            core.warning(`${commit.id} commit.${key} is not an array`);
+                            continue;
+                        }
+                        for (const file of fileList) {
                             files.add(file);
                         }
                     }
