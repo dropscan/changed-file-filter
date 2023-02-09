@@ -1,20 +1,15 @@
-import {exec} from '@actions/exec'
+import {exec, getExecOutput} from '@actions/exec'
 
 async function execForStdOut(
-  commandLine: string,
+  command: string,
   args?: string[],
   cwd?: string
 ): Promise<string> {
-  let stdout = ''
-  await exec(commandLine, args, {
+  const output = await getExecOutput(command, args, {
     cwd,
-    listeners: {
-      stdout: buffer => {
-        stdout = buffer.toString()
-      }
-    }
+    ignoreReturnCode: false
   })
-  return stdout
+  return output.stdout
 }
 
 async function getMergeBase(
@@ -26,15 +21,18 @@ async function getMergeBase(
   const depthPerLoop = 15
   for (let i = 0; i < maxLoops; i++) {
     // iteratively deepen the local checkout until the merge-base is found
-    try {
-      return execForStdOut('git', ['merge-base', shaA, shaB], cwd)
-    } catch (error) {
-      exec(
-        'git',
-        ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB],
-        {cwd}
-      )
+    const output = await getExecOutput('git', ['merge-base', shaA, shaB], {
+      cwd,
+      ignoreReturnCode: true
+    })
+    if (output.exitCode === 0) {
+      return output.stdout
     }
+    exec(
+      'git',
+      ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB],
+      {cwd}
+    )
   }
   const totalCommits = maxLoops * depthPerLoop
   throw new Error(
@@ -65,6 +63,6 @@ export async function revParse(rev: string, cwd?: string): Promise<string> {
   return output.trim()
 }
 
-export async function fetchOne(ref: string): Promise<number> {
-  return exec('git', ['fetch', '--depth', '1', 'origin', ref])
+export async function fetchWithDepth(ref: string, depth = 1): Promise<number> {
+  return exec('git', ['fetch', '--depth', depth.toString(), 'origin', ref])
 }

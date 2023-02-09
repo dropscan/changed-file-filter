@@ -3,7 +3,7 @@ import * as github from '@actions/github'
 // eslint-disable-next-line import/no-unresolved
 import {PullRequestEvent, PushEvent} from '@octokit/webhooks-definitions/schema'
 
-import {fetchOne, getChangedFiles, revParse} from './git'
+import {fetchWithDepth, getChangedFiles, revParse} from './git'
 import {parseRules} from './rule'
 
 async function run(): Promise<void> {
@@ -22,7 +22,7 @@ async function run(): Promise<void> {
         }
         if (event.created) {
           // new branch has no "before" SHA, so we compare it to the default branch
-          await fetchOne(event.repository.default_branch)
+          await fetchWithDepth(event.repository.default_branch)
           baseSha = await revParse(`origin/${event.repository.default_branch}`)
         } else if (event.forced) {
           // the old commit won't be present in our normal clone
@@ -47,7 +47,8 @@ async function run(): Promise<void> {
     core.debug(`baseSha: ${baseSha}`)
     core.debug(`headSha: ${headSha}`)
 
-    await fetchOne(baseSha)
+    await fetchWithDepth(baseSha)
+    await fetchWithDepth(headSha, 10)
     const changedFiles = await getChangedFiles(baseSha, headSha)
     core.debug(`changedFiles: ${changedFiles}`)
     for (const rule of rules) {

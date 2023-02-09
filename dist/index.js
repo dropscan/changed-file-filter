@@ -7,31 +7,28 @@
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.fetchOne = exports.revParse = exports.getChangedFiles = void 0;
+exports.fetchWithDepth = exports.revParse = exports.getChangedFiles = void 0;
 const exec_1 = __nccwpck_require__(1514);
-async function execForStdOut(commandLine, args, cwd) {
-    let stdout = '';
-    await (0, exec_1.exec)(commandLine, args, {
+async function execForStdOut(command, args, cwd) {
+    const output = await (0, exec_1.getExecOutput)(command, args, {
         cwd,
-        listeners: {
-            stdout: buffer => {
-                stdout = buffer.toString();
-            }
-        }
+        ignoreReturnCode: false
     });
-    return stdout;
+    return output.stdout;
 }
 async function getMergeBase(shaA, shaB, cwd) {
     const maxLoops = 10;
     const depthPerLoop = 15;
     for (let i = 0; i < maxLoops; i++) {
         // iteratively deepen the local checkout until the merge-base is found
-        try {
-            return execForStdOut('git', ['merge-base', shaA, shaB], cwd);
+        const output = await (0, exec_1.getExecOutput)('git', ['merge-base', shaA, shaB], {
+            cwd,
+            ignoreReturnCode: true
+        });
+        if (output.exitCode === 0) {
+            return output.stdout;
         }
-        catch (error) {
-            (0, exec_1.exec)('git', ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB], { cwd });
-        }
+        (0, exec_1.exec)('git', ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB], { cwd });
     }
     const totalCommits = maxLoops * depthPerLoop;
     throw new Error(`No merge base between ${shaA} and ${shaB} within last ${totalCommits} commits`);
@@ -49,10 +46,10 @@ async function revParse(rev, cwd) {
     return output.trim();
 }
 exports.revParse = revParse;
-async function fetchOne(ref) {
-    return (0, exec_1.exec)('git', ['fetch', '--depth', '1', 'origin', ref]);
+async function fetchWithDepth(ref, depth = 1) {
+    return (0, exec_1.exec)('git', ['fetch', '--depth', depth.toString(), 'origin', ref]);
 }
-exports.fetchOne = fetchOne;
+exports.fetchWithDepth = fetchWithDepth;
 
 
 /***/ }),
@@ -105,7 +102,7 @@ async function run() {
                 }
                 if (event.created) {
                     // new branch has no "before" SHA, so we compare it to the default branch
-                    await (0, git_1.fetchOne)(event.repository.default_branch);
+                    await (0, git_1.fetchWithDepth)(event.repository.default_branch);
                     baseSha = await (0, git_1.revParse)(`origin/${event.repository.default_branch}`);
                 }
                 else if (event.forced) {
@@ -130,7 +127,8 @@ async function run() {
         }
         core.debug(`baseSha: ${baseSha}`);
         core.debug(`headSha: ${headSha}`);
-        await (0, git_1.fetchOne)(baseSha);
+        await (0, git_1.fetchWithDepth)(baseSha);
+        await (0, git_1.fetchWithDepth)(headSha, 10);
         const changedFiles = await (0, git_1.getChangedFiles)(baseSha, headSha);
         core.debug(`changedFiles: ${changedFiles}`);
         for (const rule of rules) {
