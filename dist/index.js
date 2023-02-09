@@ -92,6 +92,7 @@ const git_1 = __nccwpck_require__(3374);
 const rule_1 = __nccwpck_require__(6065);
 async function run() {
     try {
+        const rules = (0, rule_1.parseRules)(core.getInput('filters'));
         let baseSha;
         let headSha;
         switch (github.context.eventName) {
@@ -109,7 +110,6 @@ async function run() {
                 }
                 else if (event.forced) {
                     // the old commit won't be present in our normal clone
-                    await (0, git_1.fetchOne)(event.before);
                     baseSha = event.before;
                 }
                 else {
@@ -130,7 +130,7 @@ async function run() {
         }
         core.debug(`baseSha: ${baseSha}`);
         core.debug(`headSha: ${headSha}`);
-        const rules = (0, rule_1.parseRules)(core.getInput('filters'));
+        await (0, git_1.fetchOne)(baseSha);
         const changedFiles = await (0, git_1.getChangedFiles)(baseSha, headSha);
         core.debug(`changedFiles: ${changedFiles}`);
         for (const rule of rules) {

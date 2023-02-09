@@ -8,6 +8,7 @@ import {parseRules} from './rule'
 
 async function run(): Promise<void> {
   try {
+    const rules = parseRules(core.getInput('filters'))
     let baseSha
     let headSha
 
@@ -25,7 +26,6 @@ async function run(): Promise<void> {
           baseSha = await revParse(`origin/${event.repository.default_branch}`)
         } else if (event.forced) {
           // the old commit won't be present in our normal clone
-          await fetchOne(event.before)
           baseSha = event.before
         } else {
           baseSha = event.before
@@ -47,7 +47,7 @@ async function run(): Promise<void> {
     core.debug(`baseSha: ${baseSha}`)
     core.debug(`headSha: ${headSha}`)
 
-    const rules = parseRules(core.getInput('filters'))
+    await fetchOne(baseSha)
     const changedFiles = await getChangedFiles(baseSha, headSha)
     core.debug(`changedFiles: ${changedFiles}`)
     for (const rule of rules) {
