@@ -21,8 +21,8 @@ async function run(): Promise<void> {
           // do not emit any changed files when a branch is deleted
           return
         }
-        if (event.created) {
-          // new branch has no "before" SHA
+        if (event.created || event.forced) {
+          // new branch has no "before" SHA, and the old commit won't be found on a force push
           baseSha = await revParse(event.repository.default_branch)
         } else {
           baseSha = event.before
