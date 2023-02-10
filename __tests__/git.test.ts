@@ -33,11 +33,12 @@ describe('getChangedFiles', () => {
     const writeAndCommitFile = async (
       filepath: string,
       fileContent: string,
-      commitMessage: string
+      commitMessage: string,
+      flags: string[] = []
     ) => {
       await writeFile(path.join(testzone, filepath), fileContent)
       await execGit(['add', filepath])
-      await execGit(['commit', '-m', commitMessage])
+      await execGit(['commit', ...flags, '-m', commitMessage])
       return revParse('HEAD', testzone)
     }
     const firstCommit = await writeAndCommitFile(
@@ -63,6 +64,16 @@ describe('getChangedFiles', () => {
     ])
     expect(await getChangedFiles(firstCommit, thirdCommit, testzone)).toEqual([
       'second',
+      'third'
+    ])
+
+    const fourthCommit = await writeAndCommitFile(
+      'third',
+      'third, amended',
+      'amend third',
+      ['--amend']
+    )
+    expect(await getChangedFiles(thirdCommit, fourthCommit, testzone)).toEqual([
       'third'
     ])
   })
