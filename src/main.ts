@@ -47,7 +47,7 @@ async function run(): Promise<void> {
     core.debug(`baseSha: ${baseSha}`)
     core.debug(`headSha: ${headSha}`)
 
-    await fetchWithDepth(baseSha)
+    await fetchWithDepth(baseSha, 10)
     await fetchWithDepth(headSha, 10)
     const changedFiles = await getChangedFiles(baseSha, headSha)
     core.debug(`changedFiles: ${changedFiles}`)

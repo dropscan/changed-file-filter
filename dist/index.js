@@ -18,9 +18,9 @@ async function execForStdOut(command, args, cwd) {
 }
 async function getMergeBase(shaA, shaB, cwd) {
     const maxLoops = 10;
-    const depthPerLoop = 15;
+    const depthPerLoop = 50;
+    // iteratively deepen the local checkout until a merge-base is found
     for (let i = 0; i < maxLoops; i++) {
-        // iteratively deepen the local checkout until the merge-base is found
         const output = await (0, exec_1.getExecOutput)('git', ['merge-base', shaA, shaB], {
             cwd,
             ignoreReturnCode: true
@@ -28,7 +28,7 @@ async function getMergeBase(shaA, shaB, cwd) {
         if (output.exitCode === 0) {
             return output.stdout;
         }
-        (0, exec_1.exec)('git', ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB], { cwd });
+        await (0, exec_1.exec)('git', ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB], { cwd });
     }
     const totalCommits = maxLoops * depthPerLoop;
     throw new Error(`No merge base between ${shaA} and ${shaB} within last ${totalCommits} commits`);
@@ -127,7 +127,7 @@ async function run() {
         }
         core.debug(`baseSha: ${baseSha}`);
         core.debug(`headSha: ${headSha}`);
-        await (0, git_1.fetchWithDepth)(baseSha);
+        await (0, git_1.fetchWithDepth)(baseSha, 10);
         await (0, git_1.fetchWithDepth)(headSha, 10);
         const changedFiles = await (0, git_1.getChangedFiles)(baseSha, headSha);
         core.debug(`changedFiles: ${changedFiles}`);
