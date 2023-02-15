@@ -21,7 +21,7 @@ async function getMergeBase(
   const depthPerLoop = 50
 
   // iteratively deepen the local checkout until a merge-base is found
-  for (let i = 0; i < maxLoops; i++) {
+  for (let i = 1; i <= maxLoops; i++) {
     const output = await getExecOutput('git', ['merge-base', shaA, shaB], {
       cwd,
       ignoreReturnCode: true
@@ -29,11 +29,8 @@ async function getMergeBase(
     if (output.exitCode === 0) {
       return output.stdout
     }
-    await exec(
-      'git',
-      ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB],
-      {cwd}
-    )
+    await fetchWithDepth(shaA, depthPerLoop * i)
+    await fetchWithDepth(shaB, depthPerLoop * i)
   }
   const totalCommits = maxLoops * depthPerLoop
   throw new Error(

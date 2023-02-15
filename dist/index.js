@@ -20,7 +20,7 @@ async function getMergeBase(shaA, shaB, cwd) {
     const maxLoops = 10;
     const depthPerLoop = 50;
     // iteratively deepen the local checkout until a merge-base is found
-    for (let i = 0; i < maxLoops; i++) {
+    for (let i = 1; i <= maxLoops; i++) {
         const output = await (0, exec_1.getExecOutput)('git', ['merge-base', shaA, shaB], {
             cwd,
             ignoreReturnCode: true
@@ -28,7 +28,8 @@ async function getMergeBase(shaA, shaB, cwd) {
         if (output.exitCode === 0) {
             return output.stdout;
         }
-        await (0, exec_1.exec)('git', ['fetch', '--deepen', depthPerLoop.toString(), 'origin', shaA, shaB], { cwd });
+        await fetchWithDepth(shaA, depthPerLoop * i);
+        await fetchWithDepth(shaB, depthPerLoop * i);
     }
     const totalCommits = maxLoops * depthPerLoop;
     throw new Error(`No merge base between ${shaA} and ${shaB} within last ${totalCommits} commits`);
